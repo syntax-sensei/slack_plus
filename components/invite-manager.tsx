@@ -1,12 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { UserPlus, Copy, Check, RefreshCw } from "lucide-react"
-import { nanoid } from "@/lib/nanoid"
 
 interface InviteManagerProps {
   currentUser: any
@@ -19,77 +17,53 @@ export function InviteManager({ currentUser }: InviteManagerProps) {
   const [copied, setCopied] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleGenerateInvite = async () => {
+  const handleGenerateInvite = useCallback(async () => {
+    if (!currentUser?.id) {
+      alert("Current user ID is missing")
+      return
+    }
+
     setIsGenerating(true)
     try {
-      // Generate a unique code
-      const code = nanoid(10)
-
-      // Set expiration to 7 days from now
-      const expiresAtDate = new Date()
-      expiresAtDate.setDate(expiresAtDate.getDate() + 7)
-
-      console.log("Generating invite with:", {
-        code,
-        currentUserId: currentUser?.id,
-        expiresAt: expiresAtDate.toISOString(),
+      const response = await fetch("/api/invite/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id }),
       })
 
-      if (!currentUser?.id) {
-        throw new Error("Current user ID is missing")
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate invite code")
       }
 
-      // Insert the code into the database
-      const { data, error } = await supabase
-        .from("invite_codes")
-        .insert({
-          code,
-          created_by: currentUser.id,
-          expires_at: expiresAtDate.toISOString(),
-          uses_remaining: 5, // Allow 5 uses per code
-          is_active: true,
-        })
-        .select()
-
-      console.log("Insert result:", { data, error })
-
-      if (error) {
-        console.error("Supabase error:", error)
-        throw new Error(error.message || "Failed to create invite code")
-      }
-
-      if (!data || data.length === 0) {
-        throw new Error("No data returned from invite code creation")
-      }
-
-      setInviteCode(code)
-      setExpiresAt(expiresAtDate.toISOString())
-
-      console.log("Invite code generated successfully:", code)
+      setInviteCode(data.inviteCode.code)
+      setExpiresAt(data.inviteCode.expires_at)
     } catch (err) {
-      console.error("Exception generating invite:", err)
       const errorMessage = err instanceof Error ? err.message : "Unknown error occurred"
       alert(`Failed to generate invite link: ${errorMessage}`)
     } finally {
       setIsGenerating(false)
     }
-  }
+  }, [currentUser?.id])
 
-  const getInviteLink = () => {
-    if (typeof window === "undefined") return ""
+  const getInviteLink = useCallback(() => {
+    if (typeof window === "undefined" || !inviteCode) return ""
     return `${window.location.origin}/invite/${inviteCode}`
-  }
+  }, [inviteCode])
 
-  const copyInviteLink = async () => {
+  const copyInviteLink = useCallback(async () => {
+    const link = getInviteLink()
+    if (!link) return
+
     try {
-      await navigator.clipboard.writeText(getInviteLink())
+      await navigator.clipboard.writeText(link)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error("Failed to copy to clipboard:", err)
       // Fallback for older browsers
       const textArea = document.createElement("textarea")
-      textArea.value = getInviteLink()
+      textArea.value = link
       document.body.appendChild(textArea)
       textArea.select()
       document.execCommand("copy")
@@ -97,9 +71,9 @@ export function InviteManager({ currentUser }: InviteManagerProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
-  }
+  }, [getInviteLink])
 
-  const formatExpiryDate = (dateString: string) => {
+  const formatExpiryDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -107,13 +81,13 @@ export function InviteManager({ currentUser }: InviteManagerProps) {
       hour: "2-digit",
       minute: "2-digit",
     })
-  }
+  }, [])
 
-  const resetDialog = () => {
+  const resetDialog = useCallback(() => {
     setInviteCode(null)
     setExpiresAt(null)
     setCopied(false)
-  }
+  }, [])
 
   return (
     <Dialog

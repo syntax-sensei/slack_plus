@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Users, X, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
@@ -97,10 +97,10 @@ export function MembersPanel({ currentUser }: MembersPanelProps) {
               <Users className="w-5 h-5" />
               Workspace Members
             </DialogTitle>
-            <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
-              <X className="w-4 h-4" />
-            </Button>
           </div>
+          <DialogDescription className="text-gray-400">
+            View and search all members in your workspace
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mb-4">

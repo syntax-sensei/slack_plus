@@ -1,57 +1,56 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const messageId = params.id;
+    // Ensure params is properly awaited
+    const { id: messageId } = await Promise.resolve(params);
 
     if (!messageId) {
       console.error('Delete Message API Error: Message ID is missing.');
-      return NextResponse.json({ error: 'Message ID is required.' }, { status: 400 });
+      return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    // Start a transaction if your Supabase client supports it, or handle sequentially
-    // For simplicity in this example, we'll perform sequential deletes.
-
-    // Delete replies first
-    const { error: deleteRepliesError } = await supabase
+    // First delete all replies associated with this message
+    const { error: repliesError } = await supabase
       .from('messages')
       .delete()
       .eq('parent_message_id', messageId);
 
-    if (deleteRepliesError) {
-      console.error(`Delete Message API Error: Failed to delete replies for message ${messageId}:`, deleteRepliesError);
-      // Depending on requirements, you might stop here or attempt to delete the parent anyway
-      return NextResponse.json(
-        { error: 'Failed to delete message replies.', details: deleteRepliesError },
-        { status: 500 }
-      );
+    if (repliesError) {
+      console.error('Delete Message API Error:', repliesError);
+      return NextResponse.json({ error: 'Failed to delete message replies' }, { status: 500 });
     }
-    
+
     console.log(`Delete Message API: Successfully deleted replies for message ${messageId}.`);
 
     // Then delete the parent message
-    const { error: deleteParentError } = await supabase
+    const { error: messageError } = await supabase
       .from('messages')
       .delete()
       .eq('id', messageId);
 
-    if (deleteParentError) {
-      console.error(`Delete Message API Error: Failed to delete parent message ${messageId}:`, deleteParentError);
-      return NextResponse.json(
-        { error: 'Failed to delete parent message.', details: deleteParentError },
-        { status: 500 }
-      );
+    if (messageError) {
+      console.error('Delete Message API Error:', messageError);
+      return NextResponse.json({ error: 'Failed to delete message' }, { status: 500 });
     }
 
     console.log(`Delete Message API: Successfully deleted parent message ${messageId}.`);
 
     return NextResponse.json({ success: true });
-
   } catch (error) {
-    console.error('Delete Message API Error: Uncaught error processing request:', error);
+    console.error('Delete Message API Error:', error);
     return NextResponse.json(
-      { error: 'An unexpected server error occurred.' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
